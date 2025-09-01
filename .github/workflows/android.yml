@@ -1,1 +1,57 @@
-﻿<PASTE THE YAML ABOVE HERE>
+﻿name: Android CI (stable, no cache)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Ensures cmdline-tools are present
+          cmdline-tools-version: 12266719
+
+      # Accept *all* SDK licenses (covers edge cases where the action flag doesn’t)
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install required SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      # Use Gradle CLI (no cache) to generate wrapper in this runner
+      - name: Set up Gradle 8.7 (no cache)
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+          cache-disabled: true
+
+      - name: Generate Gradle Wrapper (8.7)
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Build with extra logs and stability flags
+      - name: Build Debug APK
+        run: ./gradlew build --no-daemon --no-parallel --stacktrace --info
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
