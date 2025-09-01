@@ -1,4 +1,4 @@
-﻿name: Android CI
+name: Android CI (no cache)
 
 on:
   workflow_dispatch:
@@ -8,15 +8,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-          cache: 'gradle'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -26,11 +27,13 @@ jobs:
           sdkmanager --licenses <<<'y'
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      # Repo is lightweight, so generate Gradle wrapper in the runner
-      - name: Set up Gradle 8.7
+      # Repo is lightweight (no wrapper), so install a Gradle CLI just for this job,
+      # with caching explicitly disabled to avoid flaky cache saves.
+      - name: Set up Gradle 8.7 (no cache)
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
+          cache-disabled: true
 
       - name: Generate Gradle Wrapper (8.7)
         run: gradle wrapper --gradle-version 8.7
@@ -38,9 +41,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # Use a broad 'build' to ensure all tasks run; extra flags improve logs & stability.
       - name: Build Debug APK
-        run: ./gradlew build --no-daemon --stacktrace --info
-        
+        run: ./gradlew build --no-daemon --stacktrace --info --no-parallel
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
